@@ -40,6 +40,11 @@ serde = { version = "1.0.229", features = ["derive"] }
 toml = "1.1.5"
 thiserror = "2.0.20"
 directories = "6.0.0"
+# Fuzzy filtering (T1.4). Only the synchronous `Matcher`/`Pattern` API (re-exported
+# from nucleo-matcher) is used — the crate's `Nucleo` worker spawns a rayon
+# threadpool, which never runs on wasm32-unknown-unknown; reduce() must stay
+# synchronous anyway, so that worker is never constructed.
+nucleo = "0.5.0"
 
 [profile.release]
 panic = "unwind"
