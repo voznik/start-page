@@ -7,6 +7,16 @@ license.workspace = true
 [lib]
 crate-type = ["cdylib"]
 
+[features]
+# Daemon-backed providers (sp-engine, sp-api polling/SSE) will live behind this
+# once phase 3 builds them. Today sp-engine is an empty stub and nothing in
+# this crate is daemon-backed, so this flag gates nothing yet -- it exists so
+# `trunk build --release --no-default-features` (T2.3, static deployment) is
+# already the shape that later phases plug providers into, instead of being
+# retrofitted then.
+default = ["daemon"]
+daemon = []
+
 [dependencies]
 sp-core.workspace = true
 sp-ui.workspace = true

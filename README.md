@@ -84,6 +84,18 @@ trunk build --release
 
 Output lands in `dist/`. The Nerd Font is self-hosted from `assets/`, not a CDN.
 
+`trunk build --release --no-default-features` produces a self-contained `dist/` for static hosting
+with no daemon behind it.
+
+**`dist/` must be served over http, not opened from `file://`.** Chrome blocks the module script
+and the `.wasm` fetch from a `file://` origin under CORS ("Cross origin requests are only supported
+for protocol schemes: ... http, https"), so the app never boots and you get a blank themed page.
+This is a browser restriction, not something the build can avoid. Any static server works:
+
+```bash
+cd crates/sp-web-host/dist && python3 -m http.server 8000
+```
+
 ## Development
 
 ```bash
