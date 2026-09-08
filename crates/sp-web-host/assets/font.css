@@ -6,9 +6,12 @@
   font-display: swap;
 }
 
+/* Cell geometry vars (--sp-font/--sp-font-size/--sp-line-height) are declared once in
+   index.html's :root — shared with the boot shell so their cell size can never drift from
+   the booted grid's. */
 pre {
-  font-family: "JetBrainsMono Nerd Font Mono", monospace;
-  font-size: 16px;
-  line-height: 1.2;
+  font-family: var(--sp-font);
+  font-size: var(--sp-font-size);
+  line-height: var(--sp-line-height);
   margin: 0;
 }

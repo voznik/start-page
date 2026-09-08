@@ -25,9 +25,9 @@ JavaScript framework underneath it.
 
 ## Status
 
-**v0.1 — the terminal UI.** `start-page tui` is usable daily. The browser target builds and
-renders (that was proven before anything else was written), but it does not open links yet, so it
-is currently look-don't-touch. `serve`, `sync` and `import` are not implemented.
+**v0.1.** Both modes work: `start-page tui` in the terminal, `start-page serve` in the browser.
+Typing, filtering, opening links and search are live in both. `sync` and `import` are not
+implemented, and there are no data providers yet — links come from config.
 
 ## Install
 
@@ -40,12 +40,28 @@ start-page tui
 
 Tagged releases build binaries for x86_64 and aarch64 across Linux, macOS and Windows.
 
-In Docker (the binary only — `serve` isn't implemented, so this is mostly useful for CI):
+## Serve it
+
+```bash
+cargo xtask dist          # builds the browser bundle and the binary
+start-page serve          # http://127.0.0.1:7878
+```
+
+The browser UI is compiled into the binary — there are no asset files to deploy alongside it, and
+assets are served brotli-precompressed.
+
+Binds localhost by default, because a dashboard on `0.0.0.0` is a dashboard your whole network can
+read. `--expose` widens it, `--port` changes the port.
+
+In Docker:
 
 ```bash
 docker build -t start-page .
-docker run --rm start-page config path
+docker run --rm -p 7878:7878 start-page serve --expose
 ```
+
+`--expose` is required in the container: without it the daemon binds `127.0.0.1` *inside* the
+container and the published port reaches nothing.
 
 ## Keys
 
@@ -84,17 +100,12 @@ trunk build --release
 
 Output lands in `dist/`. The Nerd Font is self-hosted from `assets/`, not a CDN.
 
-`trunk build --release --no-default-features` produces a self-contained `dist/` for static hosting
-with no daemon behind it.
+`trunk build --release --no-default-features` produces a self-contained `dist/` you can drop on
+any static host, for when you don't want the daemon at all.
 
-**`dist/` must be served over http, not opened from `file://`.** Chrome blocks the module script
-and the `.wasm` fetch from a `file://` origin under CORS ("Cross origin requests are only supported
-for protocol schemes: ... http, https"), so the app never boots and you get a blank themed page.
-This is a browser restriction, not something the build can avoid. Any static server works:
-
-```bash
-cd crates/sp-web-host/dist && python3 -m http.server 8000
-```
+Serve it over http — `file://` does not work, because Chrome blocks the module script and the
+`.wasm` fetch from a null origin under CORS. That's a browser rule, not something the build can
+work around.
 
 ## Development
 

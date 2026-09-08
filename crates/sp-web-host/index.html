@@ -11,6 +11,28 @@
     <link data-trunk rel="copy-file" href="assets/fonts/JetBrainsMonoNerdFontMono-Regular-subset-min.woff2" data-target-path="fonts" />
     <link data-trunk rel="css" href="assets/font.css" />
     <style>
+      /* Inline, not (only) an external stylesheet: these vars have to be applied on first
+         paint, before any network round trip, or the boot shell they style renders unstyled
+         for a moment under a slow connection — the exact flash this item exists to prevent.
+         font.css's `pre` rule (loaded separately) consumes the same --sp-font/--sp-font-size/
+         --sp-line-height vars, so the boot shell's cell size can never drift from the booted
+         grid's. */
+      :root {
+        /* Mirrors `Theme::default()` in crates/sp-core/src/theme.rs — update both together if
+           that palette changes. */
+        --sp-bg: #121317;
+        --sp-border: #1e212b;
+        --sp-fg: #e2e2e2;
+        --sp-black: #16161e;
+        --sp-blue: #2bc3de;
+        --sp-cyan: #62e0e2;
+        --sp-gray: #97989d;
+
+        --sp-font: "JetBrainsMono Nerd Font Mono", monospace;
+        --sp-font-size: 16px;
+        --sp-line-height: 1.2;
+      }
+
       body {
         margin: 0;
         width: 100%;
@@ -20,9 +42,100 @@
         justify-content: center;
         align-items: center;
         align-content: center;
-        background-color: #121212;
+        background-color: var(--sp-bg);
+      }
+
+      #boot-shell {
+        display: flex;
+        flex-direction: column;
+        width: 100vw;
+        height: 100vh;
+        background-color: var(--sp-bg);
+        color: var(--sp-fg);
+      }
+
+      /* Mirrors sp_ui::render's Layout::vertical([Length(1), Min(0), Length(1)]): a one-line
+         prompt, the bordered link block filling the rest, and a one-line status bar. */
+      #boot-shell pre {
+        background-color: var(--sp-bg);
+        color: var(--sp-fg);
+      }
+
+      .shell-prompt {
+        flex: 0 0 auto;
+      }
+
+      .shell-prompt .c-blue {
+        color: var(--sp-blue);
+      }
+
+      /* Wraps .shell-frame so .shell-title (which needs to sit half on top of the frame's
+         border) isn't clipped by the frame's own overflow: hidden, which it would be as a
+         child positioned outside the frame's box. */
+      .shell-frame-wrap {
+        position: relative;
+        flex: 1 1 auto;
+        min-height: 0;
+        /* Top margin leaves room for .shell-title to sit on the border above without
+           overlapping .shell-prompt, the flex sibling above it. */
+        margin: 0.9em 0.5ch 0;
+      }
+
+      .shell-frame {
+        height: 100%;
+        padding: 0.6em 1ch 0;
+        border: 1px solid var(--sp-border);
+        overflow: hidden;
+      }
+
+      /* Ratatui embeds a block's title text directly into its top border line; approximated
+         here as a label sitting on top of the CSS border, background-matched so it "erases"
+         the line under it the same way the real border row never draws characters under the
+         title. */
+      .shell-title {
+        position: absolute;
+        top: -0.7em;
+        left: 1.5ch;
+        padding: 0 1ch;
+        background-color: var(--sp-bg);
+        color: var(--sp-fg);
+        font-family: var(--sp-font);
+        font-size: var(--sp-font-size);
+      }
+
+      .shell-link {
+        display: block;
+      }
+
+      .shell-selected {
+        color: var(--sp-black);
+        background-color: var(--sp-cyan);
+      }
+
+      .shell-status {
+        flex: 0 0 auto;
+        color: var(--sp-gray);
+        opacity: 0.7;
+      }
+
+      /* Ratzilla's DomBackend appends its own #grid div as a sibling of #boot-shell once WASM
+         boots (it never clears body on first paint) — this drops the shell the instant that
+         happens rather than leaving it behind underneath the real grid. */
+      body:has(#grid) #boot-shell {
+        display: none;
       }
     </style>
   </head>
-  <body></body>
+  <body>
+    <!-- Static themed shell shown until WASM boots; hidden by the body:has(#grid) rule above
+         once ratzilla's real grid appears. -->
+    <div id="boot-shell" aria-hidden="true">
+<pre class="shell-prompt"><span class="c-blue">&gt; </span></pre>
+<div class="shell-frame-wrap">
+<span class="shell-title">start-page</span>
+<pre class="shell-frame"><span class="shell-link shell-selected">github.com</span><span class="shell-link">docs.rs</span><span class="shell-link">news.ycombinator.com</span></pre>
+</div>
+<pre class="shell-status">3/3 links</pre>
+    </div>
+  </body>
 </html>

@@ -1,64 +1,61 @@
 # syntax=docker/dockerfile:1
 
-# Builds the sp-cli binary ("start-page") for the native (server/tui) target only.
-# The wasm32 browser bundle (crates/sp-web-host) is trunk's job, not this image's —
-# T2.4 will rust-embed dist/ into the binary; this Dockerfile does not touch wasm.
+# Builds the "start-page" binary, including the wasm32 browser bundle that
+# sp-server embeds. Both modes (tui and serve) work from the resulting image.
+#
+# Requires BuildKit for the cache mounts below (default in modern Docker; set
+# DOCKER_BUILDKIT=1 on older daemons).
 
-# Must match rust-toolchain.toml. The image ships this compiler, and the copied
-# rust-toolchain.toml would otherwise make cargo download a second one on every
-# build.
+# Must match rust-toolchain.toml, which is copied in and would otherwise make
+# rustup download a second compiler mid-build.
 FROM rust:1.96-bookworm AS builder
 WORKDIR /app
 
-# --- Dependency layer -------------------------------------------------------
-# Copy manifests only (no .rs files) so this layer's cache key is unaffected by
-# source edits. Workspace this small doesn't earn cargo-chef: 9 crates, a
-# handful of leaf deps (clap, anyhow, serde, toml, thiserror, directories) —
-# the extra chef-plan/chef-cook stages and chef binary compile would cost more
-# than they save. Hand-rolled stub build gets the same caching for free.
-COPY Cargo.toml rust-toolchain.toml ./
-COPY crates/sp-core/Cargo.toml crates/sp-core/Cargo.toml
-COPY crates/sp-ui/Cargo.toml crates/sp-ui/Cargo.toml
-COPY crates/sp-config/Cargo.toml crates/sp-config/Cargo.toml
-COPY crates/sp-api/Cargo.toml crates/sp-api/Cargo.toml
-COPY crates/sp-engine/Cargo.toml crates/sp-engine/Cargo.toml
-COPY crates/sp-server/Cargo.toml crates/sp-server/Cargo.toml
-COPY crates/sp-tui-host/Cargo.toml crates/sp-tui-host/Cargo.toml
-COPY crates/sp-web-host/Cargo.toml crates/sp-web-host/Cargo.toml
-COPY crates/sp-cli/Cargo.toml crates/sp-cli/Cargo.toml
-
-# Stub every crate's source so cargo can resolve the workspace and prebuild
-# dependencies without the real code present.
+# trunk builds the wasm bundle. Installed as a release binary rather than
+# `cargo install` (which would compile it from source on every cold build).
+ARG TARGETARCH
+ARG TRUNK_VERSION=0.21.14
 RUN set -eux; \
-    for d in crates/*/; do \
-        mkdir -p "${d}src"; \
-        printf 'fn main() {}\n' > "${d}src/main.rs"; \
-        printf '\n' > "${d}src/lib.rs"; \
-    done; \
-    cargo build --release -p sp-cli
+    case "${TARGETARCH:-amd64}" in \
+      amd64) arch=x86_64-unknown-linux-gnu ;; \
+      arm64) arch=aarch64-unknown-linux-gnu ;; \
+      *) echo "unsupported TARGETARCH: ${TARGETARCH}" >&2; exit 1 ;; \
+    esac; \
+    wget -qO- "https://github.com/trunk-rs/trunk/releases/download/v${TRUNK_VERSION}/trunk-${arch}.tar.gz" \
+      | tar -xzf - -C /usr/local/bin trunk
 
-# --- Source layer ------------------------------------------------------------
-# Real source overwrites the stubs; cargo only recompiles crates whose content
-# actually changed, so dependency compilation above stays cached.
-COPY crates crates
-# BuildKit's COPY preserves source mtimes from the build context, which can
-# predate the stub files' build-time mtimes above — without this, cargo's
-# mtime-based fingerprint thinks nothing changed and ships the stub binary.
-RUN find crates -name '*.rs' -exec touch {} +
-RUN cargo build --release -p sp-cli
+COPY . .
+
+# `xtask dist` is the same one command a developer runs locally: trunk build,
+# brotli-compress each asset, then build sp-cli. Order matters — sp-server
+# embeds crates/sp-web-host/dist at compile time via rust-embed, and building
+# sp-cli first still succeeds (build.rs creates an empty dist/) while producing
+# a daemon that serves nothing. The brotli step matters too: ServeDir's
+# .precompressed_br() looks for .br siblings, so running plain `trunk build`
+# here would silently drop compression.
+#
+# Cache mounts replace the hand-rolled manifest-stub layer this file used to
+# carry: cargo's own incremental state persists across builds instead of being
+# approximated by dummy source files. Note /app/target is a cache mount and so
+# is NOT part of the image layer — the binary must be copied out inside the
+# same RUN, or it vanishes with the mount.
+RUN --mount=type=cache,target=/usr/local/cargo/registry,sharing=locked \
+    --mount=type=cache,target=/app/target,sharing=locked \
+    cargo xtask dist && \
+    cp target/release/start-page /usr/local/bin/start-page
 
 # --- Runtime -----------------------------------------------------------------
-# distroless/cc: our binary dynamically links glibc + libgcc (no TLS/openssl
-# dependency yet), and distroless carries no shell/package manager — smallest
-# attack surface that still satisfies the glibc link. :nonroot runs as uid 65532.
+# distroless/cc: the binary dynamically links glibc + libgcc (no TLS/openssl
+# dependency yet), and distroless carries no shell or package manager — smallest
+# attack surface that still satisfies the glibc link. :nonroot is uid 65532.
 FROM gcr.io/distroless/cc-debian12:nonroot AS runtime
 
-COPY --from=builder /app/target/release/start-page /usr/local/bin/start-page
+COPY --from=builder /usr/local/bin/start-page /usr/local/bin/start-page
 
-# sp-server's bind port isn't defined anywhere in the codebase yet (sp-server
-# is an empty stub). 8080 is provisional, chosen here only to document the
-# image's intent — no config plumbing exists to honor it.
-EXPOSE 8080
+# start-page serve's default port. It binds 127.0.0.1 by default, which inside a
+# container is unreachable from a published port — run `serve --expose` for the
+# mapping to work.
+EXPOSE 7878
 
 USER nonroot
 ENTRYPOINT ["/usr/local/bin/start-page"]

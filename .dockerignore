@@ -1,7 +1,8 @@
 .git
 target
+# Build output — the image runs trunk itself. assets/ is NOT excluded: trunk
+# needs the self-hosted font and stylesheets to build the bundle.
 dist
-crates/sp-web-host/assets
 docs
 data
 scripts
