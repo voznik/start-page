@@ -1,0 +1,7 @@
+[toolchain]
+# Single source of truth for the compiler across local, CI and the container.
+# rustup reads this file automatically on any cargo invocation, and installs the
+# components and targets below with it.
+channel = "1.96.0"
+components = ["clippy", "rustfmt"]
+targets = ["wasm32-unknown-unknown"]

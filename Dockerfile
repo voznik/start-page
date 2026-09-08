@@ -4,7 +4,10 @@
 # The wasm32 browser bundle (crates/sp-web-host) is trunk's job, not this image's —
 # T2.4 will rust-embed dist/ into the binary; this Dockerfile does not touch wasm.
 
-FROM rust:1.85-bookworm AS builder
+# Must match rust-toolchain.toml. The image ships this compiler, and the copied
+# rust-toolchain.toml would otherwise make cargo download a second one on every
+# build.
+FROM rust:1.96-bookworm AS builder
 WORKDIR /app
 
 # --- Dependency layer -------------------------------------------------------
@@ -13,7 +16,7 @@ WORKDIR /app
 # handful of leaf deps (clap, anyhow, serde, toml, thiserror, directories) —
 # the extra chef-plan/chef-cook stages and chef binary compile would cost more
 # than they save. Hand-rolled stub build gets the same caching for free.
-COPY Cargo.toml ./
+COPY Cargo.toml rust-toolchain.toml ./
 COPY crates/sp-core/Cargo.toml crates/sp-core/Cargo.toml
 COPY crates/sp-ui/Cargo.toml crates/sp-ui/Cargo.toml
 COPY crates/sp-config/Cargo.toml crates/sp-config/Cargo.toml

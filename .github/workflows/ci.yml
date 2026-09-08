@@ -18,10 +18,12 @@ jobs:
     steps:
       - uses: actions/checkout@v7
 
-      - uses: dtolnay/rust-toolchain@stable
-        with:
-          targets: wasm32-unknown-unknown
-          components: clippy
+      # No toolchain pinned here: rust-toolchain.toml is the single source of
+      # truth, and rustup installs the channel, components and targets it names.
+      # Pinning a version in this file too would let the two drift apart.
+      - name: install toolchain from rust-toolchain.toml
+        shell: bash
+        run: rustup show active-toolchain || rustup toolchain install
 
       - uses: Swatinem/rust-cache@v2
 
@@ -47,9 +49,9 @@ jobs:
     steps:
       - uses: actions/checkout@v7
 
-      - uses: dtolnay/rust-toolchain@stable
-        with:
-          targets: wasm32-unknown-unknown
+      - name: install toolchain from rust-toolchain.toml
+        shell: bash
+        run: rustup show active-toolchain || rustup toolchain install
 
       - uses: Swatinem/rust-cache@v2
 
