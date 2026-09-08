@@ -7,7 +7,7 @@ use ratzilla::ratatui::backend::Backend as _;
 use ratzilla::ratatui::layout::Rect;
 use ratzilla::ratatui::{Terminal, TerminalOptions, Viewport};
 use ratzilla::{web_sys, DomBackend, WebRenderer};
-use sp_core::AppState;
+use sp_core::{reduce, AppState, Intent};
 use wasm_bindgen::prelude::*;
 use wasm_bindgen::JsCast;
 
@@ -41,18 +41,19 @@ pub fn run() -> Result<(), JsValue> {
     )
     .map_err(|e| JsValue::from_str(&e.to_string()))?;
 
-    // T0.2 keystroke-path probe only: sp_ui::Key is uninhabited and sp_core::Intent has zero
-    // variants, so there's nothing to route through sp_ui::key_to_intent yet. Mutate AppState
-    // directly here; replace with a KeyCode -> sp_ui::Key -> key_to_intent -> reduce() pipeline
-    // once those types grow real variants (T1.x), mirroring sp-tui-host's crossterm mapping.
+    // sp_ui::Key/key_to_intent are still uninhabited stubs (T1.2 owns that mapping), so map
+    // ratzilla's KeyCode straight to Intent here and drive it through the real reducer.
     terminal.on_key_event({
         let state = state.clone();
-        move |key_event| match key_event.code {
-            KeyCode::Char(c) => state.borrow_mut().typed.push(c),
-            KeyCode::Backspace => {
-                state.borrow_mut().typed.pop();
+        move |key_event| {
+            let intent = match key_event.code {
+                KeyCode::Char(c) => Some(Intent::Char(c)),
+                KeyCode::Backspace => Some(Intent::Backspace),
+                _ => None,
+            };
+            if let Some(intent) = intent {
+                reduce(&mut state.borrow_mut(), intent);
             }
-            _ => {}
         }
     }).map_err(|e| JsValue::from_str(&e.to_string()))?;
 
