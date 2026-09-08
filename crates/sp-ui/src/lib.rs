@@ -3,12 +3,16 @@
 //! Must never depend on crossterm, ratzilla, tokio, or any provider crate — each host maps its
 //! own key type into `Key`.
 
+mod key;
+
 use ratatui::layout::{Constraint, Direction, Layout};
 use ratatui::style::Color as RatatuiColor;
 use ratatui::text::Line;
 use ratatui::widgets::{Block, List, Paragraph};
 use ratatui::Frame;
-use sp_core::{AppState, Intent, Theme};
+use sp_core::{AppState, Theme};
+
+pub use key::{key_to_intent, Key, Modifiers};
 
 /// Ratatui-facing colour palette. Lives here, not in `sp-core`, because `sp-core` must not
 /// depend on ratatui (see CLAUDE.md crate map).
@@ -67,10 +71,4 @@ pub fn render(frame: &mut Frame, state: &AppState) {
         chunks[0],
     );
     frame.render_widget(List::new(state.links.iter().map(String::as_str)), inner);
-}
-
-pub enum Key {}
-
-pub fn key_to_intent(_key: Key) -> Option<Intent> {
-    None
 }
