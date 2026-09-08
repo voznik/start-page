@@ -7,3 +7,5 @@ license.workspace = true
 [dependencies]
 sp-core.workspace = true
 ratatui.workspace = true
+unicode-truncate.workspace = true
+unicode-width.workspace = true

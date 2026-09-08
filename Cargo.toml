@@ -45,6 +45,10 @@ directories = "6.0.0"
 # threadpool, which never runs on wasm32-unknown-unknown; reduce() must stay
 # synchronous anyway, so that worker is never constructed.
 nucleo = "0.5.0"
+# Ellipsizing long link names in sp-ui (T1.3). Already an internal dependency of ratatui-core
+# (used there for the same string-truncation problem), so this just makes it explicit for sp-ui.
+unicode-truncate = "2"
+unicode-width = "0.2"
 
 [profile.release]
 panic = "unwind"
