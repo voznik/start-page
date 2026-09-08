@@ -50,6 +50,35 @@ These break silently and are expensive to unwind. Both are CI-enforced; do not d
    isolated and restarted, not take down the daemon. Do not set `panic = "abort"` for binary size.
 
 6. **Pin exact versions** for `ratatui`, `ratzilla`, and `tachyonfx`. They must move together.
+   Currently `ratatui = "=0.30.1"` because `ratzilla 0.3.1` hard-pins that version; a mismatch
+   produces two incompatible `ratatui` graphs and unreadable type errors. Bump them as a set.
+
+7. **`ratatui` is `default-features = false, features = ["std"]` workspace-wide.** Its default
+   features pull `crossterm` into `sp-ui` and silently break invariant 2. `sp-tui-host` enables
+   the `crossterm` feature on its own dependency line, never workspace-wide.
+
+---
+
+## Known upstream defects
+
+Worked around in our code, not forked. Re-check on any `ratzilla` bump; if upstream fixes one,
+delete the workaround rather than leaving both.
+
+- **`ratzilla 0.3.1` panics on the first redraw after any state change** — `index out of bounds`
+  at `dom.rs:321`, which kills the render loop. `DomBackend` keeps two unsynchronized sizes:
+  `cells[]` from real measured glyph size, and `Backend::size()` — the one ratatui's `autoresize()`
+  reads every frame — from a hardcoded `window/10x20` guess. First paint survives by luck.
+  `sp-web-host` pins `Viewport::Fixed` from `window_size()`, which keeps `autoresize()` off the
+  broken path. Unfixed on upstream `main` as of 2026-09-08.
+
+- **`DomBackend` attaches `keydown` to `#grid` (`tabindex="0"`), not `document`.** Nothing is
+  typed until that element has focus, which is fatal for a type-and-go start page. `sp-web-host`
+  focuses it on the first frame; the element does not exist before that.
+
+- **trunk's bundled `wasm-opt` rejects rustc's default wasm output** (`wasm-validator error ...
+  unexpected false`). `crates/sp-web-host/.cargo/config.toml` disables bulk-memory and
+  nontrapping-fptoint at codegen. That file is force-tracked: a common global gitignore excludes
+  `.cargo`, and without it a fresh clone cannot build the browser target.
 
 ---
 
@@ -79,10 +108,17 @@ Run all of these before declaring any task done.
 
 ```bash
 cargo check -p sp-core -p sp-ui -p sp-api --target wasm32-unknown-unknown
-cargo tree -p sp-ui | grep -qE 'crossterm|ratzilla|tokio' && { echo "sp-ui boundary violated"; exit 1; }
+./scripts/check-ui-boundary.sh
 cargo clippy --workspace --all-targets -- -D warnings
 cargo test --workspace
 ```
+
+The boundary check is a script, not an inline `cargo tree | grep`: grep exits 1 when the tree is
+*clean*, so the obvious one-liner reports backwards in a shell step. CI runs the same script.
+
+A green `cargo check` or `trunk build` proves the browser target compiles, never that it runs.
+Anything touching `sp-web-host` needs a real browser load — the ratzilla redraw panic above passed
+every compile-time gate we had.
 
 ---
 
