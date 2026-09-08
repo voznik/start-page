@@ -82,10 +82,9 @@ fn load_from(path: &std::path::Path) -> Result<Config, ConfigError> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use std::sync::Mutex;
-
     // Serializes tests that mutate the process-wide XDG_CONFIG_HOME env var.
-    static ENV_LOCK: Mutex<()> = Mutex::new(());
+    #[cfg(target_os = "linux")]
+    static ENV_LOCK: std::sync::Mutex<()> = std::sync::Mutex::new(());
 
     #[test]
     fn config_round_trips_through_toml() {
