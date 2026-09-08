@@ -1,0 +1,8 @@
+.git
+target
+dist
+crates/sp-web-host/assets
+docs
+data
+scripts
+*.md
