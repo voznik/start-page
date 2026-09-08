@@ -4,7 +4,12 @@ use sp_core::AppState;
 
 fn state_with_links(links: Vec<&str>) -> AppState {
     let mut state = AppState::default();
-    state.links = links.into_iter().map(str::to_string).collect();
+    let link_items: Vec<sp_core::LinkItem> = links
+        .into_iter()
+        .map(|s| sp_core::LinkItem::new(s, s, None))
+        .collect();
+    state.sections = vec![sp_core::Section::new("Links", "green", link_items.clone())];
+    state.links = link_items;
     state.filtered = (0..state.links.len()).collect();
     state
 }

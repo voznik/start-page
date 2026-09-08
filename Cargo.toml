@@ -34,10 +34,12 @@ ratatui = { version = "=0.30.1", default-features = false, features = ["std"] }
 clap = { version = "4.6.6", features = ["derive"] }
 anyhow = "1.0.104"
 crossterm = "0.29"
-ratzilla = "0.3.1"
+ratzilla = "=0.3.1"
 wasm-bindgen = "0.2"
 console_error_panic_hook = "0.1"
 serde = { version = "1.0.229", features = ["derive"] }
+serde_yaml = "0.9"
+serde_json = "1.0"
 toml = "1.1.5"
 thiserror = "2.0.20"
 directories = "6.0.0"

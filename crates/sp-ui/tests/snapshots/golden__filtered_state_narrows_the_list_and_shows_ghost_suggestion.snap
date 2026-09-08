@@ -2,27 +2,27 @@
 source: crates/sp-ui/tests/golden.rs
 expression: "render_state(&state, 80, 24)"
 ---
-  > github.com                                                                    
-  ┌start-page────────────────────────────────────────────────────────────────────┐
-> │github.com                                                                    │
-  │                                                                              │
-  │                                                                              │
-  │                                                                              │
-  │                                                                              │
-  │                                                                              │
-  │                                                                              │
-  │                                                                              │
-  │                                                                              │
-  │                                                                              │
-  │                                                                              │
-  │                                                                              │
-  │                                                                              │
-  │                                                                              │
-  │                                                                              │
-  │                                                                              │
-  │                                                                              │
-  │                                                                              │
-  │                                                                              │
-  │                                                                              │
-  └──────────────────────────────────────────────────────────────────────────────┘
-  1/3 links
+                                                                                  
+                                                                                  
+                                                                                  
+                                                                                  
+                                                                                  
+                                                                                  
+                                                                                  
+                                                                                  
+                                                                                  
+            Links                                                                 
+>             github.com                                                         
+              docs.rs                                                            
+              news.ycombinator.com                                               
+                                                                                  
+                                                                                  
+                                                                                  
+                                                                                  
+                                                                                  
+                                                                                  
+                                                                                  
+                                                                                  
+                                                                                  
+                                                                                  
+  excalith@firefox ❯ github.com

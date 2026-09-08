@@ -31,7 +31,10 @@ enum Command {
         command: ConfigCommand,
     },
     /// Excalith JSON importer
-    Import,
+    Import {
+        /// Path to Excalith settings.json file
+        path: std::path::PathBuf,
+    },
 }
 
 #[derive(Subcommand)]
@@ -59,6 +62,13 @@ fn main() -> anyhow::Result<()> {
                 Ok(())
             }
         },
-        Command::Import => bail!("not implemented"),
+        Command::Import { path } => {
+            let contents = std::fs::read_to_string(&path)?;
+            let config = sp_config::Config::from_excalith_json(&contents)?;
+            let target = sp_config::config_path()?;
+            sp_config::save_to(&config, &target)?;
+            println!("Imported {} -> {}", path.display(), target.display());
+            Ok(())
+        }
     }
 }

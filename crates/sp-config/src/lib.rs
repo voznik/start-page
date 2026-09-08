@@ -8,7 +8,33 @@ use std::path::PathBuf;
 
 use directories::ProjectDirs;
 use serde::{Deserialize, Serialize};
-use sp_core::{SearchEngine, Shortcut, Theme};
+use sp_core::{SearchEngine, Section, Shortcut, Theme};
+
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(default)]
+pub struct PromptConfig {
+    pub placeholder: String,
+    #[serde(alias = "promptSymbol")]
+    pub symbol: String,
+    #[serde(alias = "userColor")]
+    pub user_color: String,
+    #[serde(alias = "hostColor")]
+    pub host_color: String,
+    #[serde(alias = "promptColor")]
+    pub prompt_color: String,
+}
+
+impl Default for PromptConfig {
+    fn default() -> Self {
+        Self {
+            placeholder: "command...".to_string(),
+            symbol: "❯".to_string(),
+            user_color: "green".to_string(),
+            host_color: "magenta".to_string(),
+            prompt_color: "magenta".to_string(),
+        }
+    }
+}
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[serde(default)]
@@ -16,21 +42,39 @@ pub struct Config {
     pub username: String,
     pub title: String,
     pub theme: Theme,
-    /// Default search engine for bare text with no filter match (T1.5).
+    pub prompt: PromptConfig,
+    pub sections: Vec<Section>,
+    /// Default search engine for bare text with no filter match.
     pub default_engine: SearchEngine,
-    /// Configured shortcut prefixes, e.g. `s some bug` -> StackOverflow search (T1.5).
+    /// Configured shortcut prefixes, e.g. `s some bug` -> StackOverflow search.
     pub shortcuts: Vec<Shortcut>,
 }
 
 impl Default for Config {
     fn default() -> Self {
         Config {
-            username: String::new(),
-            title: String::new(),
+            username: "excalith".to_string(),
+            title: "Excalith Start Page".to_string(),
             theme: Theme::default(),
+            prompt: PromptConfig::default(),
+            sections: sp_core::default_sections(),
             default_engine: SearchEngine::default(),
             shortcuts: sp_core::default_shortcuts(),
         }
+    }
+}
+
+impl From<Config> for sp_core::AppState {
+    fn from(c: Config) -> Self {
+        sp_core::AppState::new(
+            c.title,
+            c.username,
+            c.prompt.symbol,
+            c.theme,
+            c.sections,
+            c.default_engine,
+            c.shortcuts,
+        )
     }
 }
 
@@ -44,19 +88,29 @@ pub enum ConfigError {
         #[source]
         source: std::io::Error,
     },
-    #[error("failed to parse config file {path}: {source}")]
+    #[error("failed to parse YAML config file {path}: {source}")]
     Parse {
         path: PathBuf,
         #[source]
-        source: toml::de::Error,
+        source: serde_yaml::Error,
+    },
+    #[error("failed to serialize YAML config: {source}")]
+    Serialize {
+        #[source]
+        source: serde_yaml::Error,
+    },
+    #[error("failed to parse Excalith JSON: {source}")]
+    ParseJson {
+        #[source]
+        source: serde_json::Error,
     },
 }
 
-/// Resolved path to `config.toml`, honouring `XDG_CONFIG_HOME` on Linux and the platform
+/// Resolved path to `config.yaml`, honouring `XDG_CONFIG_HOME` on Linux and the platform
 /// equivalent elsewhere (`directories::ProjectDirs`).
 pub fn config_path() -> Result<PathBuf, ConfigError> {
     let dirs = ProjectDirs::from("", "", "start-page").ok_or(ConfigError::NoConfigDir)?;
-    Ok(dirs.config_dir().join("config.toml"))
+    Ok(dirs.config_dir().join("config.yaml"))
 }
 
 /// Load the config from the resolved XDG path. A missing file yields `Config::default()`,
@@ -65,9 +119,9 @@ pub fn load() -> Result<Config, ConfigError> {
     load_from(&config_path()?)
 }
 
-fn load_from(path: &std::path::Path) -> Result<Config, ConfigError> {
+pub fn load_from(path: &std::path::Path) -> Result<Config, ConfigError> {
     match fs::read_to_string(path) {
-        Ok(contents) => toml::from_str(&contents).map_err(|source| ConfigError::Parse {
+        Ok(contents) => serde_yaml::from_str(&contents).map_err(|source| ConfigError::Parse {
             path: path.to_path_buf(),
             source,
         }),
@@ -79,6 +133,95 @@ fn load_from(path: &std::path::Path) -> Result<Config, ConfigError> {
     }
 }
 
+pub fn save_to(config: &Config, path: &std::path::Path) -> Result<(), ConfigError> {
+    if let Some(parent) = path.parent() {
+        fs::create_dir_all(parent).map_err(|source| ConfigError::Io {
+            path: parent.to_path_buf(),
+            source,
+        })?;
+    }
+    let yaml = serde_yaml::to_string(config).map_err(|source| ConfigError::Serialize { source })?;
+    fs::write(path, yaml).map_err(|source| ConfigError::Io {
+        path: path.to_path_buf(),
+        source,
+    })?;
+    Ok(())
+}
+
+// --- Excalith JSON parsing structures ---
+
+#[derive(Deserialize)]
+struct ExcalithRaw {
+    username: Option<String>,
+    title: Option<String>,
+    theme: Option<Theme>,
+    prompt: Option<PromptConfig>,
+    search: Option<ExcalithSearchRaw>,
+    sections: Option<ExcalithSectionsRaw>,
+}
+
+#[derive(Deserialize)]
+struct ExcalithSearchRaw {
+    default: Option<String>,
+    #[serde(default)]
+    shortcuts: Vec<ExcalithShortcutRaw>,
+}
+
+#[derive(Deserialize)]
+struct ExcalithShortcutRaw {
+    alias: String,
+    url: String,
+}
+
+#[derive(Deserialize)]
+struct ExcalithSectionsRaw {
+    #[serde(default)]
+    list: Vec<Section>,
+}
+
+impl Config {
+    /// Parses an Excalith `settings.json` content string into `Config`.
+    pub fn from_excalith_json(json_str: &str) -> Result<Self, ConfigError> {
+        let raw: ExcalithRaw =
+            serde_json::from_str(json_str).map_err(|source| ConfigError::ParseJson { source })?;
+        let def = Config::default();
+
+        let default_engine = raw
+            .search
+            .as_ref()
+            .and_then(|s| s.default.as_deref())
+            .map(|u| SearchEngine {
+                url_template: u.replace("{}", "{query}"),
+            })
+            .unwrap_or(def.default_engine);
+
+        let shortcuts = raw
+            .search
+            .map(|s| {
+                s.shortcuts
+                    .into_iter()
+                    .map(|item| Shortcut {
+                        prefix: item.alias,
+                        engine: SearchEngine {
+                            url_template: item.url.replace("{}", "{query}"),
+                        },
+                    })
+                    .collect()
+            })
+            .unwrap_or(def.shortcuts);
+
+        Ok(Config {
+            username: raw.username.unwrap_or(def.username),
+            title: raw.title.unwrap_or(def.title),
+            theme: raw.theme.unwrap_or(def.theme),
+            prompt: raw.prompt.unwrap_or(def.prompt),
+            sections: raw.sections.map(|s| s.list).unwrap_or(def.sections),
+            default_engine,
+            shortcuts,
+        })
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -87,33 +230,43 @@ mod tests {
     static ENV_LOCK: std::sync::Mutex<()> = std::sync::Mutex::new(());
 
     #[test]
-    fn config_round_trips_through_toml() {
+    fn config_round_trips_through_yaml() {
         let config = Config {
             username: "voznik".to_string(),
             title: "start-page".to_string(),
             ..Config::default()
         };
-        let toml = toml::to_string(&config).unwrap();
-        let back: Config = toml::from_str(&toml).unwrap();
+        let yaml = serde_yaml::to_string(&config).unwrap();
+        let back: Config = serde_yaml::from_str(&yaml).unwrap();
         assert_eq!(config, back);
     }
 
     #[test]
     fn missing_config_file_yields_defaults() {
         let dir = std::env::temp_dir().join("sp-config-test-missing");
-        let path = dir.join("does-not-exist.toml");
+        let path = dir.join("does-not-exist.yaml");
         assert_eq!(load_from(&path).unwrap(), Config::default());
     }
 
-    // XDG_CONFIG_HOME is a Linux/XDG-spec convention; `directories` ignores it on macOS and
-    // Windows in favour of the platform-native directories.
+    #[test]
+    fn parses_excalith_settings_json() {
+        let json = include_str!("../../../data/settings.json");
+        let config = Config::from_excalith_json(json).expect("should parse settings.json");
+        assert_eq!(config.username, "Excalith");
+        assert_eq!(config.title, "Excalith Start Page");
+        assert_eq!(config.prompt.symbol, "❯");
+        assert_eq!(config.sections.len(), 6);
+        assert_eq!(config.sections[0].title, "General");
+        assert_eq!(config.sections[0].links.len(), 4);
+        assert_eq!(config.sections[0].links[0].name, "Portfolio");
+        assert_eq!(config.sections[0].links[0].url, "https://cancellek.com");
+    }
+
     #[cfg(target_os = "linux")]
     #[test]
     fn config_path_respects_xdg_config_home() {
         let _guard = ENV_LOCK.lock().unwrap();
         let temp = std::env::temp_dir().join("sp-config-test-xdg");
-        // Safety: guarded by ENV_LOCK, no other test in this crate reads/writes this var
-        // concurrently.
         unsafe {
             std::env::set_var("XDG_CONFIG_HOME", &temp);
         }
@@ -121,6 +274,6 @@ mod tests {
         unsafe {
             std::env::remove_var("XDG_CONFIG_HOME");
         }
-        assert_eq!(resolved, temp.join("start-page").join("config.toml"));
+        assert_eq!(resolved, temp.join("start-page").join("config.yaml"));
     }
 }

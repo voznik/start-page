@@ -59,10 +59,14 @@ impl<'de> Deserialize<'de> for Color {
 /// A named colour theme. Field names match the palette carried by the archived Excalith
 /// `data/themes/*.json` fixtures (background/window/text plus the 8 ANSI-ish names).
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(default)]
 pub struct Theme {
     pub name: String,
+    #[serde(alias = "backgroundColor")]
     pub background: Color,
+    #[serde(alias = "windowColor")]
     pub window: Color,
+    #[serde(alias = "textColor")]
     pub text: Color,
     pub black: Color,
     pub red: Color,

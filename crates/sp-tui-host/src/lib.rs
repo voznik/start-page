@@ -87,7 +87,7 @@ pub fn run() -> std::io::Result<()> {
     .expect("failed to install SIGINT handler");
 
     let mut terminal = ratatui::init();
-    let mut state = AppState::default();
+    let mut state: AppState = sp_config::load().unwrap_or_default().into();
 
     let result = loop {
         terminal.draw(|frame| sp_ui::render(frame, &state))?;

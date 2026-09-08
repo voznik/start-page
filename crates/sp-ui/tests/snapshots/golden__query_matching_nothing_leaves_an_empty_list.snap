@@ -2,27 +2,27 @@
 source: crates/sp-ui/tests/golden.rs
 expression: "render_state(&state, 80, 24)"
 ---
-  > zzz_no_match_zzz                                                              
-  ┌start-page────────────────────────────────────────────────────────────────────┐
-  │                                                                              │
-  │                                                                              │
-  │                                                                              │
-  │                                                                              │
-  │                                                                              │
-  │                                                                              │
-  │                                                                              │
-  │                                                                              │
-  │                                                                              │
-  │                                                                              │
-  │                                                                              │
-  │                                                                              │
-  │                                                                              │
-  │                                                                              │
-  │                                                                              │
-  │                                                                              │
-  │                                                                              │
-  │                                                                              │
-  │                                                                              │
-  │                                                                              │
-  └──────────────────────────────────────────────────────────────────────────────┘
-  0/3 links
+                                                                                  
+                                                                                  
+                                                                                  
+                                                                                  
+                                                                                  
+                                                                                  
+                                                                                  
+                                                                                  
+                                                                                  
+            Links                                                                 
+>             github.com                                                         
+              docs.rs                                                            
+              news.ycombinator.com                                               
+                                                                                  
+                                                                                  
+                                                                                  
+                                                                                  
+                                                                                  
+                                                                                  
+                                                                                  
+                                                                                  
+                                                                                  
+                                                                                  
+  excalith@firefox ❯ zzz_no_match_zzz

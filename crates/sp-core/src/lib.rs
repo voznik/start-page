@@ -98,9 +98,125 @@ pub enum Payload {
 #[derive(Debug, Clone, PartialEq)]
 pub struct Cmd(pub String);
 
+/// A link item within a dashboard section.
+/// A link item within a dashboard section.
+#[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize)]
+pub struct LinkItem {
+    #[serde(default)]
+    pub name: String,
+    #[serde(default)]
+    pub url: String,
+    pub icon: Option<String>,
+}
+
+impl LinkItem {
+    pub fn new(name: impl Into<String>, url: impl Into<String>, icon: Option<String>) -> Self {
+        Self {
+            name: name.into(),
+            url: url.into(),
+            icon,
+        }
+    }
+}
+
+fn default_section_color() -> String {
+    "green".to_string()
+}
+
+/// A dashboard section grouping categorized links.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct Section {
+    #[serde(default)]
+    pub title: String,
+    #[serde(default = "default_section_color")]
+    pub color: String,
+    #[serde(default)]
+    pub links: Vec<LinkItem>,
+}
+
+impl Section {
+    pub fn new(title: impl Into<String>, color: impl Into<String>, links: Vec<LinkItem>) -> Self {
+        Self {
+            title: title.into(),
+            color: color.into(),
+            links,
+        }
+    }
+}
+
+pub fn default_sections() -> Vec<Section> {
+    vec![
+        Section::new(
+            "General",
+            "green",
+            vec![
+                LinkItem::new("Portfolio", "https://cancellek.com", Some("mdi:web".to_string())),
+                LinkItem::new("Keybase", "https://keybase.io/", Some("fa-brands:keybase".to_string())),
+                LinkItem::new("GPT", "https://chat.openai.com/", Some("simple-icons:openai".to_string())),
+                LinkItem::new("OCI", "https://www.oracle.com/cloud/", Some("simple-icons:oracle".to_string())),
+            ],
+        ),
+        Section::new(
+            "Dev",
+            "magenta",
+            vec![
+                LinkItem::new("GitHub", "https://github.com", Some("mdi:github".to_string())),
+                LinkItem::new("GitLab", "https://gitlab.com", Some("ph:gitlab-logo-simple-fill".to_string())),
+                LinkItem::new("Dev.to", "https://dev.to", Some("material-symbols:logo-dev".to_string())),
+                LinkItem::new("Stack Overflow", "https://stackoverflow.com/", Some("mdi:stack-overflow".to_string())),
+            ],
+        ),
+        Section::new(
+            "Social",
+            "cyan",
+            vec![
+                LinkItem::new("Twitter", "https://twitter.com", Some("mdi:twitter".to_string())),
+                LinkItem::new("Mastodon", "https://mastodon.social/", Some("ri:mastodon-fill".to_string())),
+                LinkItem::new("Reddit", "https://reddit.com", Some("mdi:reddit".to_string())),
+                LinkItem::new("Polywork", "https://polywork.com", Some("simple-icons:polywork".to_string())),
+            ],
+        ),
+        Section::new(
+            "Gaming",
+            "red",
+            vec![
+                LinkItem::new("Polygon", "https://polygon.com", Some("uil:polygon".to_string())),
+                LinkItem::new("IGN", "https://ign.com", Some("mdi:currency-sign".to_string())),
+                LinkItem::new("RPS", "https://rockpapershotgun.com/", Some("ph:toilet-paper-bold".to_string())),
+                LinkItem::new("80lv", "https://80.lv/", Some("tabler:hand-rock".to_string())),
+            ],
+        ),
+        Section::new(
+            "Science",
+            "blue",
+            vec![
+                LinkItem::new("PopSci", "https://popsci.com/", Some("material-symbols:science".to_string())),
+                LinkItem::new("Space", "https://space.com/", Some("fa6-solid:user-astronaut".to_string())),
+                LinkItem::new("NASA", "https://blogs.nasa.gov/", Some("simple-icons:nasa".to_string())),
+                LinkItem::new("ESA", "https://blogs.esa.int/", Some("mdi:black-mesa".to_string())),
+            ],
+        ),
+        Section::new(
+            "Tech",
+            "yellow",
+            vec![
+                LinkItem::new("TechCrunch", "https://techcrunch.com/", Some("game-icons:techno-heart".to_string())),
+                LinkItem::new("Verge", "https://www.theverge.com/", Some("arcticons:verge".to_string())),
+                LinkItem::new("It's Foss", "https://itsfoss.com/", Some("ri:mastodon-fill".to_string())),
+                LinkItem::new("9To5 Linux", "https://9to5linux.com/", Some("uil:linux".to_string())),
+            ],
+        ),
+    ]
+}
+
 pub struct AppState {
     pub title: String,
-    pub links: Vec<String>,
+    pub username: String,
+    pub hostname: String,
+    pub prompt_symbol: String,
+    pub theme: Theme,
+    pub sections: Vec<Section>,
+    pub links: Vec<LinkItem>,
     /// Text typed into the prompt line. Fuzzy filtering (T1.4) and command parsing (T1.5)
     /// build on this; T1.1 only tracks the raw text.
     pub typed: String,
@@ -125,26 +241,49 @@ pub struct AppState {
     matcher: Matcher,
 }
 
-impl Default for AppState {
-    fn default() -> Self {
-        let links = vec![
-            "github.com".to_string(),
-            "docs.rs".to_string(),
-            "news.ycombinator.com".to_string(),
-        ];
+impl AppState {
+    pub fn new(
+        title: impl Into<String>,
+        username: impl Into<String>,
+        prompt_symbol: impl Into<String>,
+        theme: Theme,
+        sections: Vec<Section>,
+        default_engine: SearchEngine,
+        shortcuts: Vec<Shortcut>,
+    ) -> Self {
+        let links: Vec<LinkItem> = sections.iter().flat_map(|s| s.links.clone()).collect();
         let filtered = (0..links.len()).collect();
         Self {
-            title: "start-page".to_string(),
+            title: title.into(),
+            username: username.into(),
+            hostname: "firefox".to_string(),
+            prompt_symbol: prompt_symbol.into(),
+            theme,
+            sections,
             links,
             typed: String::new(),
             selected: 0,
             filtered,
             suggestion: None,
             should_quit: false,
-            default_engine: SearchEngine::default(),
-            shortcuts: default_shortcuts(),
+            default_engine,
+            shortcuts,
             matcher: Matcher::default(),
         }
+    }
+}
+
+impl Default for AppState {
+    fn default() -> Self {
+        Self::new(
+            "start-page",
+            "excalith",
+            "❯",
+            Theme::default(),
+            default_sections(),
+            SearchEngine::default(),
+            default_shortcuts(),
+        )
     }
 }
 
@@ -159,23 +298,33 @@ fn refilter(state: &mut AppState) {
     }
 
     let pattern = Pattern::parse(&state.typed, CaseMatching::Ignore, Normalization::Smart);
-    let mut buf = Vec::new();
+    let mut buf_name = Vec::new();
+    let mut buf_url = Vec::new();
     let mut scored: Vec<(usize, u32)> = state
         .links
         .iter()
         .enumerate()
         .filter_map(|(i, link)| {
-            let haystack = Utf32Str::new(link, &mut buf);
-            pattern
-                .score(haystack, &mut state.matcher)
-                .map(|score| (i, score))
+            buf_name.clear();
+            buf_url.clear();
+            let haystack_name = Utf32Str::new(&link.name, &mut buf_name);
+            let score_name = pattern.score(haystack_name, &mut state.matcher);
+            let haystack_url = Utf32Str::new(&link.url, &mut buf_url);
+            let score_url = pattern.score(haystack_url, &mut state.matcher);
+
+            match (score_name, score_url) {
+                (Some(s1), Some(s2)) => Some((i, s1.max(s2))),
+                (Some(s1), None) => Some((i, s1)),
+                (None, Some(s2)) => Some((i, s2)),
+                (None, None) => None,
+            }
         })
         .collect();
     scored.sort_by_key(|&(_, score)| Reverse(score));
 
     state.suggestion = scored
         .first()
-        .map(|&(i, _)| state.links[i].clone());
+        .map(|&(i, _)| state.links[i].name.clone());
     state.filtered = scored.into_iter().map(|(i, _)| i).collect();
 }
 
@@ -250,7 +399,7 @@ fn dispatch_command(state: &AppState, text: &str) -> Vec<Effect> {
             .filtered
             .iter()
             .filter_map(|&i| state.links.get(i))
-            .map(|link| Effect::OpenUrl(normalize_url(link)))
+            .map(|link| Effect::OpenUrl(normalize_url(&link.url)))
             .collect();
     }
 
@@ -291,10 +440,10 @@ pub fn reduce(state: &mut AppState, intent: Intent) -> Vec<Effect> {
                 state
                     .links
                     .get(state.selected)
-                    .map(|link| vec![Effect::OpenUrl(normalize_url(link))])
+                    .map(|link| vec![Effect::OpenUrl(normalize_url(&link.url))])
                     .unwrap_or_default()
             } else {
-                dispatch_command(state, &state.typed.clone())
+                dispatch_command(state, &state.typed)
             }
         }
         // Ctrl+Enter: always search the typed text with the default engine, bypassing
@@ -308,7 +457,7 @@ pub fn reduce(state: &mut AppState, intent: Intent) -> Vec<Effect> {
             }
         }
         Intent::AcceptSuggestion => {
-            if let Some(suggestion) = state.suggestion.clone() {
+            if let Some(suggestion) = state.suggestion.take() {
                 state.typed = suggestion;
                 state.selected = 0;
                 refilter(state);
@@ -341,12 +490,24 @@ mod tests {
     }
 
     fn base_state() -> AppState {
+        let links = vec![
+            LinkItem::new("a", "https://a", None),
+            LinkItem::new("b", "https://b", None),
+            LinkItem::new("c", "https://c", None),
+        ];
+        let sections = vec![Section::new("Default", "green", links.clone())];
+        let filtered = (0..links.len()).collect();
         AppState {
             title: "start-page".to_string(),
-            links: vec!["a".to_string(), "b".to_string(), "c".to_string()],
+            username: "excalith".to_string(),
+            hostname: "firefox".to_string(),
+            prompt_symbol: "❯".to_string(),
+            theme: Theme::default(),
+            sections,
+            links,
             typed: String::new(),
             selected: 0,
-            filtered: vec![0, 1, 2],
+            filtered,
             suggestion: None,
             should_quit: false,
             default_engine: SearchEngine::default(),
@@ -437,7 +598,10 @@ mod tests {
     #[test]
     fn opening_a_link_gives_it_a_scheme() {
         let mut state = base_state();
-        state.links = vec!["github.com".into(), "https://docs.rs".into()];
+        state.links = vec![
+            LinkItem::new("github.com", "github.com", None),
+            LinkItem::new("docs.rs", "https://docs.rs", None),
+        ];
         state.selected = 0;
         assert_eq!(
             reduce(&mut state, Intent::Activate),
@@ -463,7 +627,10 @@ mod tests {
     #[test]
     fn typing_filters_and_suggests_the_top_match() {
         let mut state = base_state();
-        state.links = vec!["github.com".to_string(), "docs.rs".to_string()];
+        state.links = vec![
+            LinkItem::new("github.com", "https://github.com", None),
+            LinkItem::new("docs.rs", "https://docs.rs", None),
+        ];
         for c in "git".chars() {
             reduce(&mut state, Intent::Char(c));
         }
@@ -481,7 +648,10 @@ mod tests {
     #[test]
     fn accept_suggestion_replaces_typed_with_the_top_match() {
         let mut state = base_state();
-        state.links = vec!["github.com".to_string(), "docs.rs".to_string()];
+        state.links = vec![
+            LinkItem::new("github.com", "https://github.com", None),
+            LinkItem::new("docs.rs", "https://docs.rs", None),
+        ];
         reduce(&mut state, Intent::Char('g'));
         reduce(&mut state, Intent::AcceptSuggestion);
         assert_eq!(state.typed, "github.com");
@@ -505,7 +675,13 @@ mod tests {
     fn filtering_1000_links_stays_under_a_millisecond_per_keystroke() {
         let mut state = base_state();
         state.links = (0..1000)
-            .map(|i| format!("https://example{i}.com/path/to/resource"))
+            .map(|i| {
+                LinkItem::new(
+                    format!("example{i}"),
+                    format!("https://example{i}.com/path/to/resource"),
+                    None,
+                )
+            })
             .collect();
         refilter(&mut state);
 
@@ -605,9 +781,9 @@ mod tests {
     fn enter_with_n_filtered_matches_emits_n_open_url_effects() {
         let mut state = base_state();
         state.links = vec![
-            "apple.com".to_string(),
-            "apricot.com".to_string(),
-            "banana.com".to_string(),
+            LinkItem::new("apple.com", "apple.com", None),
+            LinkItem::new("apricot.com", "apricot.com", None),
+            LinkItem::new("banana.com", "banana.com", None),
         ];
         for c in "ap".chars() {
             reduce(&mut state, Intent::Char(c));
