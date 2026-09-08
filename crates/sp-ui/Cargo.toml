@@ -9,3 +9,6 @@ sp-core.workspace = true
 ratatui.workspace = true
 unicode-truncate.workspace = true
 unicode-width.workspace = true
+
+[dev-dependencies]
+insta = "1.48.0"
