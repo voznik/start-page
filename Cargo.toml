@@ -1,0 +1,44 @@
+[workspace]
+resolver = "3"
+members = [
+    "crates/sp-core",
+    "crates/sp-ui",
+    "crates/sp-config",
+    "crates/sp-api",
+    "crates/sp-engine",
+    "crates/sp-server",
+    "crates/sp-tui-host",
+    "crates/sp-web-host",
+    "crates/sp-cli",
+]
+
+[workspace.package]
+edition = "2024"
+version = "0.1.0"
+license = "MIT"
+
+[workspace.dependencies]
+sp-core = { path = "crates/sp-core" }
+sp-ui = { path = "crates/sp-ui" }
+sp-config = { path = "crates/sp-config" }
+sp-api = { path = "crates/sp-api" }
+sp-engine = { path = "crates/sp-engine" }
+sp-server = { path = "crates/sp-server" }
+sp-tui-host = { path = "crates/sp-tui-host" }
+sp-web-host = { path = "crates/sp-web-host" }
+# Pinned to match ratzilla 0.3.1's hard pin on ratatui 0.30.1. sp-ui must not
+# depend on ratzilla (invariant 2), so both reach the same ratatui via unification.
+ratatui = { version = "=0.30.1", default-features = false, features = ["std"] }
+clap = { version = "4.6.6", features = ["derive"] }
+anyhow = "1.0.104"
+
+[profile.release]
+panic = "unwind"
+lto = "fat"
+codegen-units = 1
+strip = "symbols"
+opt-level = 3
+
+[profile.release-wasm]
+inherits = "release"
+opt-level = "z"

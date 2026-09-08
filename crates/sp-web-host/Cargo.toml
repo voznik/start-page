@@ -1,0 +1,8 @@
+[package]
+name = "sp-web-host"
+edition.workspace = true
+version.workspace = true
+license.workspace = true
+
+[lib]
+crate-type = ["cdylib"]

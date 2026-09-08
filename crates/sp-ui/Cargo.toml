@@ -1,0 +1,9 @@
+[package]
+name = "sp-ui"
+edition.workspace = true
+version.workspace = true
+license.workspace = true
+
+[dependencies]
+sp-core.workspace = true
+ratatui.workspace = true

@@ -1,0 +1,5 @@
+[package]
+name = "sp-engine"
+edition.workspace = true
+version.workspace = true
+license.workspace = true
