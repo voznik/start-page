@@ -3,6 +3,7 @@ name = "sp-tui-host"
 edition.workspace = true
 version.workspace = true
 license.workspace = true
+repository.workspace = true
 
 [dependencies]
 sp-core.workspace = true
@@ -13,3 +14,7 @@ ratatui = { workspace = true, features = ["crossterm"] }
 [[bin]]
 name = "sp-tui-host"
 path = "src/main.rs"
+
+# T0.2 spike binary, not a shipped product — sp-cli is the only dist target.
+[package.metadata.dist]
+dist = false

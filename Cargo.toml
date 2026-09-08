@@ -16,6 +16,7 @@ members = [
 edition = "2024"
 version = "0.1.0"
 license = "MIT"
+repository = "https://github.com/voznik/start-page"
 
 [workspace.dependencies]
 sp-core = { path = "crates/sp-core" }
@@ -50,3 +51,9 @@ opt-level = 3
 [profile.release-wasm]
 inherits = "release"
 opt-level = "z"
+
+# The profile that 'dist' will build with — must match [profile.release] in
+# CLAUDE.md exactly (panic = "unwind" is a hard invariant; lto = "fat" is required
+# for release artifacts). No overrides here.
+[profile.dist]
+inherits = "release"
