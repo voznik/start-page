@@ -3,3 +3,13 @@ name = "sp-tui-host"
 edition.workspace = true
 version.workspace = true
 license.workspace = true
+
+[dependencies]
+sp-core.workspace = true
+sp-ui.workspace = true
+crossterm.workspace = true
+ratatui = { workspace = true, features = ["crossterm"] }
+
+[[bin]]
+name = "sp-tui-host"
+path = "src/main.rs"

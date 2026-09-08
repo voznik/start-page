@@ -6,3 +6,12 @@ license.workspace = true
 
 [lib]
 crate-type = ["cdylib"]
+
+[dependencies]
+sp-core.workspace = true
+sp-ui.workspace = true
+# ratatui itself is not a direct dep: Terminal/Frame come from ratzilla::ratatui
+# (ratzilla re-exports its pinned ratatui so the two crate graphs stay unified).
+ratzilla.workspace = true
+wasm-bindgen.workspace = true
+console_error_panic_hook.workspace = true

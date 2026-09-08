@@ -1,0 +1,12 @@
+# Scoped to this crate's build dir (trunk invokes cargo with this as CWD).
+#
+# rustc's wasm32-unknown-unknown target defaults to emitting bulk-memory
+# (memory.copy) and nontrapping-fptoint instructions that the wasm-opt version
+# trunk pins (bundled Binaryen) doesn't enable in its validator, so `trunk
+# build --release` fails with "wasm-validator error ... unexpected false".
+# Disable both at codegen time instead of chasing a wasm-opt flag trunk
+# doesn't expose. `bulk-memory-opt` is unstable/unknown to rustc's feature list
+# (harmless warning) but is what the wasm-opt error message itself names as
+# the missing flag, and it's still forwarded to the codegen backend.
+[target.wasm32-unknown-unknown]
+rustflags = ["-C", "target-feature=-bulk-memory,-bulk-memory-opt,-nontrapping-fptoint"]
