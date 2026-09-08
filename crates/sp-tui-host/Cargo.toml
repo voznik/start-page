@@ -8,6 +8,7 @@ repository.workspace = true
 [dependencies]
 sp-core.workspace = true
 sp-ui.workspace = true
+sp-config.workspace = true
 crossterm.workspace = true
 ratatui = { workspace = true, features = ["crossterm"] }
 open.workspace = true

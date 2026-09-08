@@ -55,6 +55,11 @@ open = "5.4.3"
 # raw mode disables ISIG, so terminal-generated Ctrl+C never reaches the OS as a signal,
 # but an external `kill -INT` still does and needs the terminal restored before exit.
 ctrlc = "3.5.2"
+# T1.5 query-string encoding. `percent-encoding` (not `form_urlencoded`) because it produces
+# standard %-escapes (space -> %20) that every search backend and URL parser resolves
+# identically; `form_urlencoded` targets application/x-www-form-urlencoded (space -> `+`),
+# which is a narrower HTML-forms convention we don't need here. no_std-friendly, wasm32-clean.
+percent-encoding = "2.3.2"
 
 [profile.release]
 panic = "unwind"

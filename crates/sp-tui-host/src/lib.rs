@@ -13,6 +13,26 @@ fn handle_effect(effect: Effect) {
                 eprintln!("failed to open {url}: {err}");
             }
         }
+        Effect::PrintConfigPath => match sp_config::config_path() {
+            Ok(path) => eprintln!("{}", path.display()),
+            Err(err) => eprintln!("cannot resolve config path: {err}"),
+        },
+        Effect::OpenConfigInEditor => match sp_config::config_path() {
+            Ok(path) => {
+                if let Err(err) = open::that(&path) {
+                    eprintln!("failed to open {}: {err}", path.display());
+                }
+            }
+            Err(err) => eprintln!("cannot resolve config path: {err}"),
+        },
+        // Both of these need a surface the UI doesn't have yet: `render` has no help view, and
+        // AppState carries no theme (it renders Theme::default()). Writing to stderr means the
+        // message survives the alt-screen and is visible once the TUI exits — poor, but it does
+        // not silently swallow the command. Wire properly when render grows the view.
+        Effect::ShowHelp => eprintln!("help is not rendered yet (no help view in sp-ui)"),
+        Effect::SetTheme(name) => {
+            eprintln!("theme '{name}' not applied: AppState carries no theme yet")
+        }
     }
 }
 

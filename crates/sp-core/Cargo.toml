@@ -8,6 +8,7 @@ license.workspace = true
 serde.workspace = true
 thiserror.workspace = true
 nucleo.workspace = true
+percent-encoding.workspace = true
 
 [dev-dependencies]
 toml.workspace = true

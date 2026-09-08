@@ -4,7 +4,82 @@ mod theme;
 
 use nucleo::pattern::{CaseMatching, Normalization, Pattern};
 use nucleo::{Matcher, Utf32Str};
+use percent_encoding::{utf8_percent_encode, NON_ALPHANUMERIC};
+use serde::{Deserialize, Serialize};
 use std::cmp::Reverse;
+
+/// URL-encodes a query string for embedding in a search URL. Percent-encodes everything
+/// except ASCII alphanumerics (`NON_ALPHANUMERIC`), so space -> `%20`, `&` -> `%26`,
+/// `#` -> `%23`, `+` -> `%2B`, `"` -> `%22`, and non-ASCII bytes are UTF-8 percent-escaped.
+/// This is what a browser/URL parser resolves a query value as; the upstream JS project's
+/// bug was hand-rolled escaping that missed exactly these characters.
+pub fn encode_query(query: &str) -> String {
+    utf8_percent_encode(query, NON_ALPHANUMERIC).to_string()
+}
+
+/// A search engine: a URL template with a literal `{query}` placeholder, replaced with the
+/// percent-encoded query.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct SearchEngine {
+    pub url_template: String,
+}
+
+impl SearchEngine {
+    pub fn search_url(&self, query: &str) -> String {
+        self.url_template.replace("{query}", &encode_query(query))
+    }
+}
+
+impl Default for SearchEngine {
+    fn default() -> Self {
+        SearchEngine {
+            url_template: "https://www.google.com/search?q={query}".to_string(),
+        }
+    }
+}
+
+/// A configured shortcut: typing `<prefix> <rest>` searches `engine` with `rest` as the
+/// query, e.g. `s some bug` -> StackOverflow search for "some bug".
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct Shortcut {
+    pub prefix: String,
+    pub engine: SearchEngine,
+}
+
+pub fn default_shortcuts() -> Vec<Shortcut> {
+    vec![Shortcut {
+        prefix: "s".to_string(),
+        engine: SearchEngine {
+            url_template: "https://stackoverflow.com/search?q={query}".to_string(),
+        },
+    }]
+}
+
+/// Heuristic "is this a URL or a search?" decision: a single word (no whitespace)
+/// containing a dot that isn't at either edge of its host part, e.g. `github.com`.
+/// Deliberately not a full URL parser — direct URLs are single tokens the user typed to
+/// navigate, not query strings.
+pub fn looks_like_url(text: &str) -> bool {
+    let text = text.trim();
+    if text.is_empty() || text.contains(char::is_whitespace) {
+        return false;
+    }
+    if text.starts_with("http://") || text.starts_with("https://") {
+        return true;
+    }
+    let host = text.split('/').next().unwrap_or(text);
+    host.contains('.') && !host.starts_with('.') && !host.ends_with('.')
+}
+
+/// Normalizes a value that `looks_like_url` accepted into a navigable URL.
+fn normalize_url(text: &str) -> String {
+    let text = text.trim();
+    if text.starts_with("http://") || text.starts_with("https://") {
+        text.to_string()
+    } else {
+        format!("https://{text}")
+    }
+}
 
 /// Opaque provider identifier. The provider trait and registry are phase 3;
 /// this is just enough for `Intent::Refresh`/`Intent::ProviderUpdated` to typecheck.
@@ -41,6 +116,11 @@ pub struct AppState {
     /// to `Tab`) sets `typed` to this value.
     pub suggestion: Option<String>,
     pub should_quit: bool,
+    /// Default search engine for bare text with no filter match and for `Intent::ForceSearch`.
+    pub default_engine: SearchEngine,
+    /// Configured shortcut prefixes (`s some bug` -> StackOverflow), checked in `reduce`
+    /// before URL detection and before the filtered-links/search fallback.
+    pub shortcuts: Vec<Shortcut>,
     /// Reused across `reduce` calls to avoid reallocating match buffers per keystroke.
     matcher: Matcher,
 }
@@ -61,6 +141,8 @@ impl Default for AppState {
             filtered,
             suggestion: None,
             should_quit: false,
+            default_engine: SearchEngine::default(),
+            shortcuts: default_shortcuts(),
             matcher: Matcher::default(),
         }
     }
@@ -118,6 +200,61 @@ pub enum Intent {
 #[derive(Debug, Clone, PartialEq)]
 pub enum Effect {
     OpenUrl(String),
+    /// `help` command. `reduce` stays I/O-free; the host renders/displays help text.
+    ShowHelp,
+    /// `config path` command. Resolving and printing the path is filesystem work that
+    /// belongs in the host (via `sp-config::config_path`), not in `reduce`.
+    PrintConfigPath,
+    /// `config edit` command. Spawning `$EDITOR` is host I/O.
+    OpenConfigInEditor,
+    /// `theme <name>` command. Loading/applying the named theme is host work.
+    SetTheme(String),
+}
+
+/// Parses and dispatches typed command text: exact commands (`help`, `config path`,
+/// `config edit`, `theme <name>`), then configured shortcuts (`<prefix> <rest>`), then a
+/// direct-URL heuristic, then falling back to opening every filtered link, then falling
+/// back further to a default-engine search. Unknown commands never error — the last two
+/// fallbacks are exactly that guarantee.
+fn dispatch_command(state: &AppState, text: &str) -> Vec<Effect> {
+    let trimmed = text.trim();
+    if trimmed.is_empty() {
+        return Vec::new();
+    }
+
+    match trimmed {
+        "help" => return vec![Effect::ShowHelp],
+        "config path" => return vec![Effect::PrintConfigPath],
+        "config edit" => return vec![Effect::OpenConfigInEditor],
+        _ => {}
+    }
+    if let Some(name) = trimmed.strip_prefix("theme ") {
+        let name = name.trim();
+        if !name.is_empty() {
+            return vec![Effect::SetTheme(name.to_string())];
+        }
+    }
+
+    if let Some((prefix, query)) = trimmed.split_once(' ')
+        && let Some(shortcut) = state.shortcuts.iter().find(|s| s.prefix == prefix)
+    {
+        return vec![Effect::OpenUrl(shortcut.engine.search_url(query.trim()))];
+    }
+
+    if looks_like_url(trimmed) {
+        return vec![Effect::OpenUrl(normalize_url(trimmed))];
+    }
+
+    if !state.filtered.is_empty() {
+        return state
+            .filtered
+            .iter()
+            .filter_map(|&i| state.links.get(i))
+            .map(|link| Effect::OpenUrl(link.clone()))
+            .collect();
+    }
+
+    vec![Effect::OpenUrl(state.default_engine.search_url(trimmed))]
 }
 
 pub fn reduce(state: &mut AppState, intent: Intent) -> Vec<Effect> {
@@ -146,13 +283,30 @@ pub fn reduce(state: &mut AppState, intent: Intent) -> Vec<Effect> {
             }
             Vec::new()
         }
-        Intent::Activate => state
-            .links
-            .get(state.selected)
-            .map(|link| vec![Effect::OpenUrl(link.clone())])
-            .unwrap_or_default(),
-        // Building the search-engine URL (and encoding it) is T1.5's job.
-        Intent::ForceSearch => Vec::new(),
+        // Empty prompt: plain browse mode, Enter opens the highlighted link (Next/Prev
+        // moves `selected`). Non-empty prompt: command/filter mode, dispatch the typed
+        // text (shortcuts, URLs, commands, or open-all-filtered/search fallback).
+        Intent::Activate => {
+            if state.typed.trim().is_empty() {
+                state
+                    .links
+                    .get(state.selected)
+                    .map(|link| vec![Effect::OpenUrl(link.clone())])
+                    .unwrap_or_default()
+            } else {
+                dispatch_command(state, &state.typed.clone())
+            }
+        }
+        // Ctrl+Enter: always search the typed text with the default engine, bypassing
+        // shortcuts/URL detection/filtered-links-open. Empty prompt has nothing to search.
+        Intent::ForceSearch => {
+            let trimmed = state.typed.trim();
+            if trimmed.is_empty() {
+                Vec::new()
+            } else {
+                vec![Effect::OpenUrl(state.default_engine.search_url(trimmed))]
+            }
+        }
         Intent::AcceptSuggestion => {
             if let Some(suggestion) = state.suggestion.clone() {
                 state.typed = suggestion;
@@ -161,8 +315,7 @@ pub fn reduce(state: &mut AppState, intent: Intent) -> Vec<Effect> {
             }
             Vec::new()
         }
-        // Command parsing/dispatch is T1.5's job.
-        Intent::Command(_) => Vec::new(),
+        Intent::Command(Cmd(text)) => dispatch_command(state, &text),
         // Provider trait and registry are phase 3; nothing to refresh yet.
         Intent::Refresh(_) => Vec::new(),
         Intent::ProviderUpdated(_, _) => Vec::new(),
@@ -196,6 +349,8 @@ mod tests {
             filtered: vec![0, 1, 2],
             suggestion: None,
             should_quit: false,
+            default_engine: SearchEngine::default(),
+            shortcuts: default_shortcuts(),
             matcher: Matcher::default(),
         }
     }
@@ -351,5 +506,165 @@ mod tests {
             per_keystroke.as_micros() < budget,
             "per-keystroke filtering took {per_keystroke:?}, budget is {budget}us"
         );
+    }
+
+    // --- T1.5: command parser ---
+
+    /// Adversarial query-encoding cases, not happy-path: spaces, `&`, `#`, `+`, quotes,
+    /// and non-ASCII must all survive a round trip into the search URL. Verified two ways:
+    /// the literal percent-escapes a browser resolves, and a decode round trip.
+    #[test]
+    fn encode_query_survives_adversarial_characters() {
+        let query = "rust 東京 & \"quotes\" #1+2";
+        let encoded = encode_query(query);
+
+        assert_eq!(
+            encoded,
+            "rust%20%E6%9D%B1%E4%BA%AC%20%26%20%22quotes%22%20%231%2B2"
+        );
+
+        let decoded = percent_encoding::percent_decode_str(&encoded)
+            .decode_utf8()
+            .unwrap();
+        assert_eq!(decoded, query);
+    }
+
+    #[test]
+    fn search_engine_builds_url_from_encoded_query() {
+        let engine = SearchEngine {
+            url_template: "https://example.com/search?q={query}".to_string(),
+        };
+        assert_eq!(
+            engine.search_url("a b&c"),
+            "https://example.com/search?q=a%20b%26c"
+        );
+    }
+
+    #[test]
+    fn looks_like_url_accepts_bare_hosts_and_rejects_search_terms() {
+        assert!(looks_like_url("github.com"));
+        assert!(looks_like_url("https://github.com/foo"));
+        assert!(!looks_like_url("some bug"));
+        assert!(!looks_like_url("help"));
+        assert!(!looks_like_url(".com"));
+        assert!(!looks_like_url(""));
+    }
+
+    #[test]
+    fn bare_text_with_no_match_falls_back_to_default_search() {
+        let mut state = base_state();
+        for c in "zzz nonsense".chars() {
+            reduce(&mut state, Intent::Char(c));
+        }
+        assert!(state.filtered.is_empty(), "fixture should not fuzzy-match");
+        let effects = reduce(&mut state, Intent::Activate);
+        assert_eq!(
+            effects,
+            vec![Effect::OpenUrl(
+                "https://www.google.com/search?q=zzz%20nonsense".to_string()
+            )]
+        );
+    }
+
+    #[test]
+    fn unknown_command_falls_through_to_search_rather_than_erroring() {
+        let mut state = base_state();
+        state.links.clear();
+        state.filtered.clear();
+        let effects = reduce(&mut state, Intent::Command(Cmd("totally unknown thing".to_string())));
+        assert_eq!(
+            effects,
+            vec![Effect::OpenUrl(
+                "https://www.google.com/search?q=totally%20unknown%20thing".to_string()
+            )]
+        );
+    }
+
+    #[test]
+    fn enter_with_n_filtered_matches_emits_n_open_url_effects() {
+        let mut state = base_state();
+        state.links = vec![
+            "apple.com".to_string(),
+            "apricot.com".to_string(),
+            "banana.com".to_string(),
+        ];
+        for c in "ap".chars() {
+            reduce(&mut state, Intent::Char(c));
+        }
+        assert_eq!(state.filtered.len(), 2, "fixture should match two links");
+        let effects = reduce(&mut state, Intent::Activate);
+        assert_eq!(effects.len(), 2);
+        for effect in &effects {
+            assert!(matches!(effect, Effect::OpenUrl(_)));
+        }
+    }
+
+    #[test]
+    fn configured_shortcut_searches_the_shortcut_engine() {
+        let mut state = base_state();
+        let effects = reduce(
+            &mut state,
+            Intent::Command(Cmd("s some bug".to_string())),
+        );
+        assert_eq!(
+            effects,
+            vec![Effect::OpenUrl(
+                "https://stackoverflow.com/search?q=some%20bug".to_string()
+            )]
+        );
+    }
+
+    #[test]
+    fn direct_url_navigates_instead_of_searching() {
+        let mut state = base_state();
+        let effects = reduce(&mut state, Intent::Command(Cmd("github.com".to_string())));
+        assert_eq!(
+            effects,
+            vec![Effect::OpenUrl("https://github.com".to_string())]
+        );
+    }
+
+    #[test]
+    fn help_config_and_theme_commands_resolve_to_effects() {
+        let mut state = base_state();
+        assert_eq!(
+            reduce(&mut state, Intent::Command(Cmd("help".to_string()))),
+            vec![Effect::ShowHelp]
+        );
+        assert_eq!(
+            reduce(&mut state, Intent::Command(Cmd("config path".to_string()))),
+            vec![Effect::PrintConfigPath]
+        );
+        assert_eq!(
+            reduce(&mut state, Intent::Command(Cmd("config edit".to_string()))),
+            vec![Effect::OpenConfigInEditor]
+        );
+        assert_eq!(
+            reduce(&mut state, Intent::Command(Cmd("theme dracula".to_string()))),
+            vec![Effect::SetTheme("dracula".to_string())]
+        );
+    }
+
+    #[test]
+    fn force_search_bypasses_shortcuts_and_url_detection() {
+        let mut state = base_state();
+        for c in "github.com".chars() {
+            reduce(&mut state, Intent::Char(c));
+        }
+        let effects = reduce(&mut state, Intent::ForceSearch);
+        // `.` is not alphanumeric, so NON_ALPHANUMERIC percent-encodes it too (%2E) —
+        // correct and reversible, just more aggressive than a typical query-string encoder.
+        assert_eq!(
+            effects,
+            vec![Effect::OpenUrl(
+                "https://www.google.com/search?q=github%2Ecom".to_string()
+            )]
+        );
+    }
+
+    #[test]
+    fn force_search_on_empty_prompt_is_a_noop() {
+        let mut state = base_state();
+        assert!(reduce(&mut state, Intent::ForceSearch).is_empty());
     }
 }

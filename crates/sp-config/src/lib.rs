@@ -8,14 +8,30 @@ use std::path::PathBuf;
 
 use directories::ProjectDirs;
 use serde::{Deserialize, Serialize};
-use sp_core::Theme;
+use sp_core::{SearchEngine, Shortcut, Theme};
 
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, Default)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[serde(default)]
 pub struct Config {
     pub username: String,
     pub title: String,
     pub theme: Theme,
+    /// Default search engine for bare text with no filter match (T1.5).
+    pub default_engine: SearchEngine,
+    /// Configured shortcut prefixes, e.g. `s some bug` -> StackOverflow search (T1.5).
+    pub shortcuts: Vec<Shortcut>,
+}
+
+impl Default for Config {
+    fn default() -> Self {
+        Config {
+            username: String::new(),
+            title: String::new(),
+            theme: Theme::default(),
+            default_engine: SearchEngine::default(),
+            shortcuts: sp_core::default_shortcuts(),
+        }
+    }
 }
 
 #[derive(Debug, thiserror::Error)]
