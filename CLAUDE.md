@@ -149,3 +149,20 @@ One line each. Rationale is in the RFC; do not ask for it inline.
 - Commit per work item. Reference the item ID (`T0.2`) in the message.
 - When a task's acceptance criteria can't be met as written, stop and report. Do not substitute an
   adjacent approach.
+
+---
+
+## Agent context
+
+### Issue tracker
+
+See `docs/agents/issue-tracker.md` for where issues live and which operations agents may perform.
+
+### Triage labels
+
+See `docs/agents/triage-labels.md` for canonical triage roles and their concrete label strings.
+
+### Domain docs
+
+See `docs/agents/domain.md` for `CONTEXT.md`, `CONTEXT-MAP.md`, and ADR lookup rules.
+

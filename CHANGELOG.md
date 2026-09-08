@@ -17,13 +17,24 @@ First release of the Rust rewrite. The previous Next.js implementation is archiv
 - Config at `~/.config/start-page/config.toml` (`XDG_CONFIG_HOME` honoured, native paths
   elsewhere); a missing file yields defaults.
 
-### The browser target renders
+### The browser target renders and handles effects
 
-One `sp_ui::render` drives both the terminal and the browser, the latter through Ratzilla's DOM
-backend and WebAssembly. Measured warm-cache: 180ms to first contentful paint, 168ms to the first
-accepted keystroke, 94KB brotli. It does not open links yet.
+- One `sp_ui::render` drives both the terminal and the browser, the latter through Ratzilla's DOM
+  backend and WebAssembly. Measured warm-cache: 180ms to first contentful paint, 168ms to the first
+  accepted keystroke, 94KB brotli.
+- Browser host handles `Effect::OpenUrl` opening links in new tabs via `web_sys::window().open_with_url`.
+- Links are validated and prepended with `https://` if missing a scheme before passing to hosts.
+- Browser window resize re-renders cleanly without DOM artifacts or crashes.
+- Self-contained static deployment mode via `trunk build --release --no-default-features`.
 
-### Two upstream defects worked around
+### Embedded HTTP server (`start-page serve`)
+
+- `start-page serve` embeds the compiled web distribution (`dist/`) directly inside the binary via `rust-embed`.
+- Static assets are pre-compressed with Brotli and served via `tower-http` with automatic content negotiation.
+- `xtask dist` automates the pipeline from clean build to self-contained single binary.
+- Multi-stage Dockerfile builds both the browser WASM bundle and native binary in a single image.
+
+### Upstream defects worked around
 
 - Ratzilla 0.3.1 panics on the first redraw after any state change, because `DomBackend` keeps two
   unsynchronized size computations. Pinned to a fixed viewport to keep ratatui's autoresize off the
@@ -34,6 +45,7 @@ accepted keystroke, 94KB brotli. It does not open links yet.
 
 ### Not in this release
 
-`serve`, `sync` and `import` exit "not implemented". There is no error state in `AppState`, no
+`sync` and `import` exit "not implemented". There is no error state in `AppState`, no
 help view, and themes are defined but not yet selectable at runtime. Links are not grouped by
 category — the layout supports it, the data doesn't carry it yet.
+
