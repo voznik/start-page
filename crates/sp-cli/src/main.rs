@@ -37,7 +37,7 @@ fn main() -> anyhow::Result<()> {
     let cli = Cli::parse();
     match cli.command {
         Command::Serve => bail!("not implemented"),
-        Command::Tui => bail!("not implemented"),
+        Command::Tui => Ok(sp_tui_host::run()?),
         Command::Sync => bail!("not implemented"),
         Command::Config { command } => match command {
             ConfigCommand::Path => {

@@ -13,3 +13,4 @@ path = "src/main.rs"
 clap.workspace = true
 anyhow.workspace = true
 sp-config.workspace = true
+sp-tui-host.workspace = true
