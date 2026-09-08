@@ -10,6 +10,8 @@ sp-core.workspace = true
 sp-ui.workspace = true
 crossterm.workspace = true
 ratatui = { workspace = true, features = ["crossterm"] }
+open.workspace = true
+ctrlc.workspace = true
 
 [[bin]]
 name = "sp-tui-host"

@@ -49,6 +49,12 @@ nucleo = "0.5.0"
 # (used there for the same string-truncation problem), so this just makes it explicit for sp-ui.
 unicode-truncate = "2"
 unicode-width = "0.2"
+# Opens URLs via the OS-configured handler (Effect::OpenUrl in sp-tui-host).
+open = "5.4.3"
+# Catches a real SIGINT (e.g. `kill -INT`) that bypasses the Ctrl+C-as-keypress path:
+# raw mode disables ISIG, so terminal-generated Ctrl+C never reaches the OS as a signal,
+# but an external `kill -INT` still does and needs the terminal restored before exit.
+ctrlc = "3.5.2"
 
 [profile.release]
 panic = "unwind"
