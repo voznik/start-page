@@ -1,0 +1,100 @@
+name: CI
+
+on:
+  push:
+  pull_request:
+
+env:
+  CARGO_TERM_COLOR: always
+
+jobs:
+  verify:
+    name: verify (${{ matrix.os }})
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-latest, windows-latest]
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: wasm32-unknown-unknown
+          components: clippy
+
+      - uses: Swatinem/rust-cache@v2
+
+      - name: cargo check (wasm32 target, sp-core/sp-ui/sp-api)
+        run: cargo check -p sp-core -p sp-ui -p sp-api --target wasm32-unknown-unknown
+
+      # Bash explicitly: the script is a bash script and Windows runners ship
+      # git-bash, so this runs identically on all three OSes instead of only
+      # gating the (platform-invariant) dependency tree on ubuntu.
+      - name: sp-ui boundary check
+        shell: bash
+        run: ./scripts/check-ui-boundary.sh
+
+      - name: cargo clippy
+        run: cargo clippy --workspace --all-targets -- -D warnings
+
+      - name: cargo test
+        run: cargo test --workspace
+
+  wasm-size:
+    name: wasm size report (non-blocking)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: wasm32-unknown-unknown
+
+      - uses: Swatinem/rust-cache@v2
+
+      - uses: taiki-e/install-action@v2
+        with:
+          tool: trunk
+
+      - name: trunk build --release
+        working-directory: crates/sp-web-host
+        run: trunk build --release
+
+      # Deliberately non-blocking: this step only reports, it never exits
+      # non-zero. T0.3's written acceptance criterion asks for a hard gate on
+      # bundle size, but that was overridden by explicit user decision — do
+      # not "fix" this into a failing gate without checking with the user
+      # first, the softness is intentional.
+      - name: report gzipped wasm size vs baseline
+        shell: bash
+        run: |
+          set -uo pipefail
+          wasm_file=$(find crates/sp-web-host/dist -maxdepth 1 -name '*_bg.wasm' | head -n1)
+          if [ -z "$wasm_file" ]; then
+            echo "### WASM size report" >> "$GITHUB_STEP_SUMMARY"
+            echo "No \`*_bg.wasm\` found in dist/ — build likely failed upstream. Not gating on this." >> "$GITHUB_STEP_SUMMARY"
+            exit 0
+          fi
+
+          gzipped=$(gzip -9c "$wasm_file" | wc -c)
+          baseline=$(cat scripts/wasm-size-baseline.txt)
+          ceiling=$(( baseline * 125 / 100 ))
+          delta=$(( gzipped - baseline ))
+
+          {
+            echo "### WASM size report (gzip)"
+            echo ""
+            echo "| | bytes |"
+            echo "|---|---|"
+            echo "| current | $gzipped |"
+            echo "| baseline (T0.2) | $baseline |"
+            echo "| +25% ceiling | $ceiling |"
+            echo "| delta vs baseline | $delta |"
+            echo ""
+            if [ "$gzipped" -gt "$ceiling" ]; then
+              echo "**Over the +25% ceiling.** Non-blocking by design — review, but this does not fail the job."
+            else
+              echo "Within ceiling."
+            fi
+          } >> "$GITHUB_STEP_SUMMARY"
