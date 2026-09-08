@@ -250,7 +250,7 @@ fn dispatch_command(state: &AppState, text: &str) -> Vec<Effect> {
             .filtered
             .iter()
             .filter_map(|&i| state.links.get(i))
-            .map(|link| Effect::OpenUrl(link.clone()))
+            .map(|link| Effect::OpenUrl(normalize_url(link)))
             .collect();
     }
 
@@ -291,7 +291,7 @@ pub fn reduce(state: &mut AppState, intent: Intent) -> Vec<Effect> {
                 state
                     .links
                     .get(state.selected)
-                    .map(|link| vec![Effect::OpenUrl(link.clone())])
+                    .map(|link| vec![Effect::OpenUrl(normalize_url(link))])
                     .unwrap_or_default()
             } else {
                 dispatch_command(state, &state.typed.clone())
@@ -428,7 +428,28 @@ mod tests {
         let mut state = base_state();
         state.selected = 1;
         let effects = reduce(&mut state, Intent::Activate);
-        assert_eq!(effects, vec![Effect::OpenUrl("b".to_string())]);
+        assert_eq!(effects, vec![Effect::OpenUrl("https://b".to_string())]);
+    }
+
+    /// A schemeless link must not be handed to a host as a bare hostname: the browser resolves
+    /// it against the current origin (http://localhost:PORT/github.com) instead of navigating to
+    /// the site.
+    #[test]
+    fn opening_a_link_gives_it_a_scheme() {
+        let mut state = base_state();
+        state.links = vec!["github.com".into(), "https://docs.rs".into()];
+        state.selected = 0;
+        assert_eq!(
+            reduce(&mut state, Intent::Activate),
+            vec![Effect::OpenUrl("https://github.com".to_string())]
+        );
+
+        state.selected = 1;
+        assert_eq!(
+            reduce(&mut state, Intent::Activate),
+            vec![Effect::OpenUrl("https://docs.rs".to_string())],
+            "an explicit scheme must be left alone, not doubled"
+        );
     }
 
     #[test]
