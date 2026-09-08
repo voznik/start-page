@@ -1,5 +1,7 @@
 //! `AppState`, `Intent`, `reduce`, `Theme`, `Payload`, provider traits.
 
+mod theme;
+
 pub struct AppState {
     pub title: String,
     pub links: Vec<String>,
@@ -30,7 +32,7 @@ pub fn reduce(_state: &mut AppState, _intent: Intent) -> Vec<Effect> {
     Vec::new()
 }
 
-pub struct Theme;
+pub use theme::{Color, ColorParseError, Theme};
 
 pub enum Payload {}
 

@@ -35,6 +35,10 @@ crossterm = "0.29"
 ratzilla = "0.3.1"
 wasm-bindgen = "0.2"
 console_error_panic_hook = "0.1"
+serde = { version = "1.0.229", features = ["derive"] }
+toml = "1.1.5"
+thiserror = "2.0.20"
+directories = "6.0.0"
 
 [profile.release]
 panic = "unwind"

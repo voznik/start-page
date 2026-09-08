@@ -19,9 +19,18 @@ enum Command {
     /// Sync providers
     Sync,
     /// Config subcommands
-    Config,
+    Config {
+        #[command(subcommand)]
+        command: ConfigCommand,
+    },
     /// Excalith JSON importer
     Import,
+}
+
+#[derive(Subcommand)]
+enum ConfigCommand {
+    /// Print the resolved config file path
+    Path,
 }
 
 fn main() -> anyhow::Result<()> {
@@ -30,7 +39,12 @@ fn main() -> anyhow::Result<()> {
         Command::Serve => bail!("not implemented"),
         Command::Tui => bail!("not implemented"),
         Command::Sync => bail!("not implemented"),
-        Command::Config => bail!("not implemented"),
+        Command::Config { command } => match command {
+            ConfigCommand::Path => {
+                println!("{}", sp_config::config_path()?.display());
+                Ok(())
+            }
+        },
         Command::Import => bail!("not implemented"),
     }
 }

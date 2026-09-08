@@ -3,3 +3,10 @@ name = "sp-config"
 edition.workspace = true
 version.workspace = true
 license.workspace = true
+
+[dependencies]
+sp-core.workspace = true
+serde.workspace = true
+toml.workspace = true
+thiserror.workspace = true
+directories.workspace = true

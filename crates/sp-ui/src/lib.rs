@@ -4,10 +4,48 @@
 //! own key type into `Key`.
 
 use ratatui::layout::{Constraint, Direction, Layout};
+use ratatui::style::Color as RatatuiColor;
 use ratatui::text::Line;
 use ratatui::widgets::{Block, List, Paragraph};
 use ratatui::Frame;
-use sp_core::{AppState, Intent};
+use sp_core::{AppState, Intent, Theme};
+
+/// Ratatui-facing colour palette. Lives here, not in `sp-core`, because `sp-core` must not
+/// depend on ratatui (see CLAUDE.md crate map).
+pub struct TuiPalette {
+    pub background: RatatuiColor,
+    pub window: RatatuiColor,
+    pub text: RatatuiColor,
+    pub black: RatatuiColor,
+    pub red: RatatuiColor,
+    pub green: RatatuiColor,
+    pub yellow: RatatuiColor,
+    pub blue: RatatuiColor,
+    pub magenta: RatatuiColor,
+    pub cyan: RatatuiColor,
+    pub white: RatatuiColor,
+    pub gray: RatatuiColor,
+}
+
+impl From<&Theme> for TuiPalette {
+    fn from(theme: &Theme) -> Self {
+        let rgb = |c: sp_core::Color| RatatuiColor::Rgb(c.r, c.g, c.b);
+        TuiPalette {
+            background: rgb(theme.background),
+            window: rgb(theme.window),
+            text: rgb(theme.text),
+            black: rgb(theme.black),
+            red: rgb(theme.red),
+            green: rgb(theme.green),
+            yellow: rgb(theme.yellow),
+            blue: rgb(theme.blue),
+            magenta: rgb(theme.magenta),
+            cyan: rgb(theme.cyan),
+            white: rgb(theme.white),
+            gray: rgb(theme.gray),
+        }
+    }
+}
 
 /// Glyph coverage probe for T0.2: box-drawing, powerline, and Nerd Font icons.
 /// Both hosts render this identical string.
