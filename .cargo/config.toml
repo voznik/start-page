@@ -1,0 +1,4 @@
+# Global gitignore excludes `.cargo`; this file must be force-added (see CLAUDE.md
+# note on crates/sp-web-host/.cargo/config.toml) or it silently won't be tracked.
+[alias]
+xtask = "run --package xtask --"

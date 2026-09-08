@@ -10,6 +10,7 @@ members = [
     "crates/sp-tui-host",
     "crates/sp-web-host",
     "crates/sp-cli",
+    "xtask",
 ]
 
 [workspace.package]
@@ -60,6 +61,22 @@ ctrlc = "3.5.2"
 # identically; `form_urlencoded` targets application/x-www-form-urlencoded (space -> `+`),
 # which is a narrower HTML-forms convention we don't need here. no_std-friendly, wasm32-clean.
 percent-encoding = "2.3.2"
+# T2.4: sp-server's static-asset router. Tokio is allowed here (sp-server is
+# native-only, invariant 3 only forbids it in sp-core/sp-ui/sp-api).
+axum = "0.8.9"
+# `fs` feature pulls in ServeDir/ServeFile (+ mime_guess) for serving the
+# extracted asset tree with `.precompressed_br()` content negotiation.
+tower-http = { version = "0.7.1", features = ["fs"] }
+tokio = { version = "1.53.1", features = ["rt-multi-thread", "macros", "net"] }
+# Embeds crates/sp-web-host/dist/ into the sp-server binary at compile time
+# (T2.4). Requires dist/ to exist before sp-server builds — xtask dist's job.
+rust-embed = "8.12.0"
+# sp-server extracts embedded assets to a tempdir at startup so tower-http's
+# ServeDir (a real filesystem service) can serve them with .precompressed_br().
+tempfile = "3.27.0"
+# xtask dist: brotli-compresses each dist/ asset to a `.br` companion at build
+# time. Pure Rust, no external `brotli` binary required on the build machine.
+brotli = "9.0.0"
 
 [profile.release]
 panic = "unwind"

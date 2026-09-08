@@ -13,7 +13,14 @@ struct Cli {
 #[derive(Subcommand)]
 enum Command {
     /// HTTP daemon + browser UI
-    Serve,
+    Serve {
+        /// Bind to 0.0.0.0 instead of localhost, exposing the dashboard on the network.
+        #[arg(long)]
+        expose: bool,
+        /// TCP port to listen on.
+        #[arg(long, default_value_t = 7878)]
+        port: u16,
+    },
     /// Terminal UI
     Tui,
     /// Sync providers
@@ -36,7 +43,14 @@ enum ConfigCommand {
 fn main() -> anyhow::Result<()> {
     let cli = Cli::parse();
     match cli.command {
-        Command::Serve => bail!("not implemented"),
+        Command::Serve { expose, port } => {
+            let mut policy = sp_server::BindPolicy::default().with_port(port);
+            if expose {
+                policy = policy.expose(std::net::IpAddr::V4(std::net::Ipv4Addr::UNSPECIFIED));
+            }
+            sp_server::Server::run(policy)?;
+            Ok(())
+        }
         Command::Tui => Ok(sp_tui_host::run()?),
         Command::Sync => bail!("not implemented"),
         Command::Config { command } => match command {

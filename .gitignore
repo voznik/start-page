@@ -5,12 +5,18 @@
 
 # Rust
 /target
+# dist/ is build output and stays ignored. sp-server's build.rs creates the
+# directory rust-embed needs at compile time, so nothing has to be tracked here
+# — a placeholder file would not survive, since trunk wipes dist/ on every build.
 dist/
 
 # The user's global ~/.gitignore excludes `.cargo`, but sp-web-host's .cargo/config.toml
 # carries the rustflags that make `trunk build` produce a wasm-opt-valid module. Without it
 # tracked, the browser build fails on a fresh clone.
 !crates/sp-web-host/.cargo/
+
+# Same reasoning: the root .cargo/config.toml carries the `cargo xtask` alias.
+!/.cargo/
 
 # misc
 .DS_Store
