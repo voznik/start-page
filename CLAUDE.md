@@ -136,6 +136,9 @@ One line each. Rationale is in the RFC; do not ask for it inline.
 - Do not use `inventory` or distributed slices for provider registration. Explicit list.
 - Do not put `serde_json::Value` in `Payload` except behind the `Raw` variant.
 - Do not act on `docs/rfc/RFC-001-*.md`. It is superseded and recommends a different architecture.
+- Do not allocate on the render path (`Vec`, `.to_lowercase()`). Compute offsets or use static indexing, and compare slices in-place (`eq_ignore_ascii_case`).
+- Do not write intermediate raw structs for deserialization when serde attributes (`#[serde(alias = "...", default)]`) on domain types cover it.
+- Do not add `toml` or alternate config dependencies; the configuration format is `config.yaml`.
 
 ---
 
@@ -143,6 +146,8 @@ One line each. Rationale is in the RFC; do not ask for it inline.
 
 - Rust 2024 edition, `resolver = "3"`.
 - Errors: `thiserror` in libraries, `anyhow` in `sp-cli` only.
+- Configuration lives in `config.yaml` (`serde_yaml`). State initialization from config belongs in `From<Config> for AppState`.
+- Parse custom types via standard library traits (`FromStr`, `From`/`Into`) rather than bespoke slicing or regex helpers.
 - A provider that cannot run is `Status::Unavailable { reason }`, not `Status::Error`.
   "Docker not installed", "no Chrome profile", "macOS denied access" are normal states and render
   muted, never red.

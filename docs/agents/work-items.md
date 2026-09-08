@@ -156,6 +156,38 @@ This document tracks local, pre-GitHub work items and tasks implemented on the r
   - `start-page serve` runs as a fully self-contained single binary with zero runtime file dependencies.
   - `xtask dist` builds web bundle and embeds into native binary in one step.
 
+### T2.5: Excalith UI Overhaul & YAML Config Migration
+- **Status:** `[CLOSED]`
+- **Commit:** `cab56f2`
+- **Scope:** Multi-column section grid with accent colors, Nerd Font icon mapping, terminal prompt line, YAML configuration schema (`config.yaml`), Excalith JSON importer (`start-page import <path>`), zero-allocation render loop, and Ponytail simplification.
+- **Verification / Acceptance:**
+  - Passed WASM portability, UI boundary script, clippy strict, 47 unit/integration tests, and 12 golden snapshots.
+  - Net -118 lines pruned in Ponytail pass.
+
+---
+
+## Phase 3 — Docker Provider & Provider Engine
+
+### T3.1: Provider Traits, Engine Supervision & Fan-out
+- **Status:** `[OPEN]`
+- **Scope:** Define `DataProvider` trait and actor supervision in `sp-engine`. Runs actors in isolated Tokio tasks (`panic = "unwind"`), restarting with exponential backoff on failure. Broadcast state updates over `tokio::sync::watch` (last-value-wins).
+
+### T3.2: Docker Native Data Provider
+- **Status:** `[OPEN]`
+- **Scope:** `sp-docker` actor using `bollard 0.21.1`. Auto-discovers Docker/Podman sockets, negotiates version, streams container events with 30s ping watchdog, polls resource metrics (stream=false), and computes CPU/memory deltas.
+
+### T3.3: Docker UI Dashboard Widget
+- **Status:** `[OPEN]`
+- **Scope:** `sp-docker/ui` wasm32-clean widget rendering container status, health badges, ports, and resource bars in Ratatui without I/O or host dependencies.
+
+### T3.4: Server SSE Pipeline & Web Client
+- **Status:** `[OPEN]`
+- **Scope:** Wire `sp-server` `/events` endpoint (SSE) streaming serialized `Payload` updates. Connect `EventSource` in `sp-api` / `sp-web-host` and dispatch `Intent::ProviderUpdated` into state.
+
+### T3.5: Multi-Pane Dashboard Layout & Navigation
+- **Status:** `[OPEN]`
+- **Scope:** Adapt `sp-ui::render` into a responsive multi-pane layout (Links grid + Container monitor). Add keyboard navigation (`Tab`, arrow keys) for switching focus and scrolling containers.
+
 ---
 
 ## Tooling, Infrastructure & Containerization
